@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>3300 Project 1</title>
+  <script src='https://d3js.org/d3.v7.min.js'></script>
+
+</head>
+
+<body>
+  <svg id="canvas" height='700' width='700' style='margin:20px'></svg>
+  <svg id="legend" height='700' width='800' style='margin:20px'></svg>
+
+
+  <style>
+    .gridlines line {
+      stroke: lightgrey;
+    }
+
+    .gridlines .domain {
+      stroke: none;
+    }
+  </style>
+
+  <script>
+    /** CS 3300 P1 - Nada Attia, Adam Kadhim, Akshay Yadava, Jacob Ball
+     * Data Source 1: https://www.kaggle.com/sansuthi/gapminder-internet
+     * Data Source 2: https://www.kaggle.com/unsdsn/world-happiness?select=2019.csv
+     * */
+
+    /** Define the canvas on which to create graphs on. */
+    let svg = d3.select('svg#canvas');
+    let legend = d3.select('svg#legend');
+
+    /** Open both CSV files and begin processing the data */
+    d3.csv('./internetusage_income.csv').then((internetData) => {
+      d3.csv('./2019.csv').then((happinessData) => {
+
+        // clean the internet usage data by removing instances of '' and undefined
+        const cleaned_internet_data = internetData.filter(
+          d => d.incomeperperson !== '' && d.internetuserate !== '' && d.incomeperperson !== undefined &&
+            d.internetuserate !== undefined);
+
+        // cast all numeric data to Number from our internet data
+        internetData.forEach((d) => {
+          d['incomeperperson'] = Number(d['incomeperperson']);
+          d['internetuserate'] = Number(d['internetuserate']);
+        });
+
+        // clean the happiness data by eliminating instances of '' or undefined
+        const cleaned_happiness_data = happinessData.filter(
+          d => d['Country or region'] !== '' && d['Score'] !== '' && d['Country or region'] !== undefined &&
+            d['Score'] !== undefined && d !== undefined);
+
+        // convert score from string to number
+        happinessData.forEach((d) => {
+          d['Score'] = Number(d['Score']);
+        });
+
+        /** Dimensions and Scales */
+        const margins = { top: 40, right: 30, bottom: 50, left: 60 };
+        const chartWidth = 700 - margins['left'] - margins['right'];
+        const chartHeight = 700 - margins['top'] - margins['bottom'];
+
+        // create a group tag for the chart info region, and the chart area section
+        const chartInfo = svg.append('g');
+        const chartArea = svg.append('g')
+          .attr('transform', `translate(${margins['left']}, ${margins['top']})`);
+
+        // note: we verified the min and max countries of both domains are represented in both data sets
+        // scale for the income per person on x-axis
+        const xExtent = d3.extent(cleaned_internet_data, d => d['incomeperperson']);
+        const xScale = d3.scaleLinear().domain([0, 55000]).range([0, chartWidth]);
+
+        // scale for the internet usage on y-axis
+        const yExtent = d3.extent(cleaned_internet_data, d => d['internetuserate']);
+        const yScale = d3.scaleLinear().domain([0, 100]).range([chartHeight, 10]);
+
+        // color scale for the happiness score of countries
+        const happinessExtent = d3.extent(cleaned_happiness_data, d => d['Score']);
+        const happinessScale = d3.scaleSequential(d3.interpolateGreens).domain(happinessExtent);
+
+        /** Graphing each point, while cross referencing data sets */
+        // for each point of information about internet-use, cross reference its country to a matching happiness one
+        cleaned_internet_data.forEach(internet_point => {
+          let cur_country = internet_point.country;
+
+          for (let i = 0; i !== cleaned_happiness_data.length - 1; i++) {
+            // if matching country is found, add graph point otherwise we do not represent data point
+            if (cleaned_happiness_data[i]['Country or region'] === cur_country) {
+
+              // Adding circle data points to graph
+              let happinessScore = cleaned_happiness_data[i]['Score'];
+              chartArea.append('circle')
+                .attr('cx', xScale(internet_point['incomeperperson']))
+                .attr('cy', yScale(internet_point['internetuserate']))
+                .attr('r', 5)
+                .attr('fill', happinessScale(happinessScore))
+            }
+          }
+        });
+
+        /** Axes, Gridlines, Titles, and Labels */
+
+        const yAxis = d3.axisLeft(yScale)
+          .tickFormat(d3.format('.2s'))
+        const yGridlines = d3.axisLeft(yScale)
+          .tickSize(-chartWidth - 10)
+          .tickFormat('')
+
+        // y-axis gridlines and scale
+        chartInfo.append('g')
+          .attr('class', 'y axis')
+          .attr('transform', `translate(${margins['left'] - 10}, ${margins['top']})`)
+          .call(yAxis)
+        chartInfo.append('g')
+          .attr('class', 'y gridlines')
+          .attr('transform', `translate(${margins['left'] - 10}, ${margins['top']})`)
+          .call(yGridlines);
+
+
+        const xAxis = d3.axisBottom(xScale)
+          .tickFormat(d3.format('$.2s'));
+        const xGridlines = d3.axisBottom(xScale)
+          .tickSize(-chartHeight - 10)
+          .tickFormat('')
+
+        // x-axis gridlines and scale
+        chartInfo.append('g')
+          .attr('class', 'x axis')
+          .attr('transform', `translate(${margins['left']}, ${chartHeight + margins['top'] + 10})`)
+          .call(xAxis);
+        chartInfo.append('g')
+          .attr('class', 'x gridlines')
+          .attr('transform', `translate(${margins['left']}, ${chartHeight + margins['top'] + 10})`)
+          .call(xGridlines);
+
+        // Chart Title
+        chartInfo.append('text')
+          .attr('text-anchor', 'middle')
+          .attr('dominant-baseline', 'central')
+          .attr('x', 350)
+          .attr('y', 10)
+          .text('Internet Availability vs Income Per Person vs Happiness Score')
+          .style('font-family', 'Sans-Serif')
+          .style('font-size', 17)
+          .style('font-weight', 800);
+
+        // x-axis label
+        chartInfo.append('text')
+          .attr('text-anchor', 'middle')
+          .attr('dominant-baseline', 'central')
+          .attr('x', 350)
+          .attr('y', 690)
+          .text('Income Per Person (in USD)')
+          .style('font-family', 'Sans-Serif')
+          .style('font-size', 14)
+          .style('font-weight', 800);
+
+        // y-axis label
+        chartInfo.append('text')
+          .attr('text-anchor', 'middle')
+          .attr('dominant-baseline', 'central')
+          .attr('transform', 'translate(8,350)rotate(90)')
+          .text('Rate of Internet Availability')
+          .style('font-family', 'Sans-Serif')
+          .style('font-size', 14)
+          .style('font-weight', 800);
+
+          // legend title
+          chartArea.append('text')
+                  .attr('x', 425)
+                  .attr('y', 510)
+                  .text('Happiness Score Scale')
+                  .style('font-size', '12px')
+                  .style('font-family', 'Sans-Serif')
+                  .attr('alignment-baseline', 'middle')
+
+          // legend lowest and highest text
+          chartArea.append('text')
+                  .attr('x', 375)
+                  .attr('y', 565)
+                  .text('Lowest')
+                  .style('font-size', '11px')
+                  .style('font-family', 'Sans-Serif')
+                  .attr('alignment-baseline', 'middle')
+
+          chartArea.append('text')
+                  .attr('x', 560)
+                  .attr('y', 565)
+                  .text('Highest')
+                  .style('font-size', '11px')
+                  .style('font-family', 'Sans-Serif')
+                  .attr('alignment-baseline', 'middle')
+          
+          const startPos = Math.floor(xScale(35000));
+          // legend outline 
+          chartArea.append('rect')
+                  .attr('x', startPos - 1)
+                  .attr('y', yScale(10)-26)
+                  .attr('width', 202)
+                  .attr('height', 27)
+                  .attr('fill', 'black')
+
+          const maxHappiness = happinessExtent[1] - happinessExtent[0];
+          // color scale 
+          for (let i = 0; i < 100; i ++) {
+            chartArea.append('rect')
+              .attr('x', startPos + (i*2))
+              .attr('y', yScale(10)-25)
+              .attr('width', 3)
+              .attr('height', 25)
+              .attr('fill', happinessScale(happinessExtent[0] + ((i/100) * maxHappiness)))
+          }
+    
+      });
+    });
+  </script>
+
+</body>
+
+</html>
